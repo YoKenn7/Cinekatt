@@ -1,0 +1,14 @@
+{
+  "id": "com.tvenvivo.app",
+  "version": "1.0.0",
+  "vendor": "TV en Vivo",
+  "type": "web",
+  "main": "index.html",
+  "title": "TV en Vivo",
+  "icon": "icon.png",
+  "largeIcon": "icon-large.png",
+  "resolution": "1920x1080",
+  "iconColor": "#0d1015",
+  "splashBackground": "splash.png",
+  "requiredPermissions": []
+}

@@ -1,0 +1,1226 @@
+/* ==========================================================
+   TV en Vivo — estilos
+   Tema oscuro, tipo plataforma de streaming, responsive.
+   ========================================================== */
+
+:root {
+  /* Color */
+  --bg: #0d1015;
+  --surface: #151a21;
+  --surface-2: #1d232c;
+  --border: #262e39;
+  --text: #eceef1;
+  --text-dim: #8d97a5;
+  --accent: #f23b3b;      /* ámbar — "señal al aire" */
+  --accent-dim: #7a5a22;
+  --accent-anime: #b98cf5; /* violeta suave, solo para el tab de anime */
+  --danger: #e5484d;
+
+  /* Tipografía */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Layout */
+  --radius: 10px;
+  --radius-lg: 16px;
+  --gap: 1.1rem;
+  --header-h: 64px;
+
+  /* Barra lateral */
+  --sidenav-w-collapsed: 76px;
+  --sidenav-w-expanded: 248px;
+
+  /* Reproductor — glassmorphism minimalista */
+  --player-glass-bg: rgba(255, 255, 255, 0.14);
+  --player-glass-border: rgba(255, 255, 255, 0.28);
+  --player-accent: #f2a878;
+  --player-accent-strong: #eb8f5c;
+
+  /* ==========================================================
+     COVER DE ANIME — edita estos dos valores para cambiar el
+     tamaño de la portada de las series. Todo lo demás se ajusta
+     solo (la tarjeta, el grid, el hover, etc.).
+     ========================================================== */
+  --anime-cover-w: 182.02px;
+  --anime-cover-h: 273.02px;
+
+  /* ==========================================================
+     TEMA ANIME — glassmorphism, solo para #section-anime.
+     ========================================================== */
+  --anime-blue-1: #eaf1ff;
+  --anime-blue-2: #f5f1ff;
+  --anime-ink: #2b3550;
+  --anime-ink-dim: #626e8c;
+  --anime-gold: #c9962f;
+  --anime-gold-soft: rgba(201, 150, 47, 0.35);
+  --anime-glass-bg: rgba(255, 255, 255, 0.55);
+  --anime-glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --anime-glass-border: rgba(255, 255, 255, 0.75);
+  --anime-radius: 26px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Base un poco más grande que en desktop: se ve mejor a distancia en TV
+     y todo lo demás (que usa rem) escala junto con esto. */
+  font-size: 17px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation; /* evita el retraso de 300ms al tocar en móviles */
+  -webkit-tap-highlight-color: transparent;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+:focus {
+  outline: none;
+}
+
+/* Estado de foco para TV: grueso, con leve zoom, siempre visible
+   (no depende de :focus-visible, que webOS viejos no soportan). */
+.focusable:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  transform: scale(1.045);
+  position: relative;
+  z-index: 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   Barra lateral (sidenav)
+   ------------------------------------------------------------
+   Colapsada por defecto (solo íconos); se expande cuando el
+   foco del control remoto entra en ella (o con el mouse, en
+   hover) mostrando las etiquetas. Es "overlay": no empuja el
+   contenido al expandirse, para no generar saltos de layout
+   mientras el usuario navega con el D-Pad.
+   --------------------------------------------------------- */
+
+.sidenav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+  width: var(--sidenav-w-collapsed);
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 1.3rem 0.62rem;
+  background: rgba(21, 26, 33, 0.94);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  transition: width 0.22s ease, box-shadow 0.22s ease;
+}
+
+.sidenav.is-expanded {
+  width: var(--sidenav-w-expanded);
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+}
+
+.sidenav__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.55rem 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.brand__dot {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 169, 59, 0.18);
+}
+
+.brand__accent {
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+
+.sidenav__brand-text {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sidenav.is-expanded .sidenav__brand-text {
+  opacity: 1;
+  transform: none;
+}
+
+.sidenav__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sidenav__item {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.78rem 0.62rem;
+  border-radius: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidenav__icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  width: 1.7rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.sidenav__label {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sidenav.is-expanded .sidenav__label {
+  opacity: 1;
+  transform: none;
+}
+
+.sidenav__item:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.sidenav__item.is-active {
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px rgba(242, 169, 59, 0.4);
+}
+
+.sidenav__item.focusable:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  transform: none;
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* ---------------------------------------------------------
+   Secciones
+   --------------------------------------------------------- */
+
+main.content {
+  margin-left: var(--sidenav-w-collapsed);
+  max-width: 1400px;
+  padding: 2rem 2rem 4rem;
+}
+
+.section {
+  display: none;
+}
+
+.section.is-active {
+  display: block;
+  animation: fade-in 0.25s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section__head {
+  margin-bottom: 1.6rem;
+}
+
+.section__head h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.section__hint {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  margin: 0.3rem 0 0;
+}
+
+/* ---------------------------------------------------------
+   Tarjetas de canal
+   --------------------------------------------------------- */
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 1.3rem;
+}
+
+.channel-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.4rem 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.channel-card:hover,
+.channel-card:focus {
+  border-color: var(--accent-dim);
+  transform: translateY(-2px);
+}
+
+.channel-card__logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.channel-card__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.channel-card__badge {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--accent);
+}
+
+.channel-card__name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* ==========================================================
+   ANIME — tarjetas de SERIE (cover vertical)
+   Usa --anime-cover-w / --anime-cover-h definidas arriba en :root.
+   Los episodios siguen usando .channel-card (icono cuadrado chico),
+   ver más abajo por qué.
+   ========================================================== */
+
+.anime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--anime-cover-w), 1fr));
+  gap: var(--gap);
+}
+
+.anime-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: center;
+  width: 100%;
+  max-width: var(--anime-cover-w);
+  margin: 0 auto;
+  transition: transform 0.15s ease;
+}
+
+.anime-card:hover,
+.anime-card:focus {
+  transform: translateY(-3px);
+}
+
+.anime-card__cover {
+  width: 100%;
+  max-width: var(--anime-cover-w);
+  aspect-ratio: var(--anime-cover-w) / var(--anime-cover-h);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease;
+}
+
+.anime-card:hover .anime-card__cover,
+.anime-card:focus .anime-card__cover {
+  border-color: var(--accent-anime);
+}
+
+.anime-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.anime-card__badge {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.2rem;
+  color: var(--accent-anime);
+}
+
+.anime-card__name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.anime-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.anime-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-weight: 700;
+  color: var(--accent-anime);
+}
+
+/* ---------------------------------------------------------
+   Inicio — accesos rápidos
+   --------------------------------------------------------- */
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.3rem;
+}
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.7rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.home-card:hover,
+.home-card:focus {
+  border-color: var(--accent-dim);
+  transform: translateY(-2px);
+}
+
+.home-card__icon {
+  font-size: 1.9rem;
+}
+
+.home-card__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.08rem;
+  color: var(--text);
+}
+
+.home-card__hint {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------
+   Breadcrumb (navegación de Anime: serie ↔ episodios)
+   --------------------------------------------------------- */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.breadcrumb[hidden] {
+  display: none;
+}
+
+.breadcrumb__back {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.breadcrumb__back:hover {
+  color: var(--text);
+  border-color: var(--accent-anime);
+}
+
+.breadcrumb__current {
+  color: var(--text-dim);
+}
+
+.breadcrumb__current::before {
+  content: "/";
+  margin-right: 0.6rem;
+  color: var(--border);
+}
+
+/* ==========================================================
+   TEMA ANIME — glassmorphism
+   Se aplica ÚNICAMENTE dentro de #section-anime. El resto de
+   secciones (Inicio, Películas, Series, TV) no se ve afectado.
+   ========================================================== */
+
+#section-anime.anime-theme {
+  /* A diferencia de las demás secciones (que viven dentro de
+     main.content, con su margen/padding habituales), Anime se
+     "escapa" de ese contenedor y cubre toda la pantalla disponible
+     (todo excepto el ancho reservado para la barra lateral
+     colapsada), para que el fondo con bokeh/sakura y las tarjetas
+     de vidrio abarquen la pantalla completa en vez de verse como
+     un recuadro flotante. */
+  position: fixed;
+  top: 0;
+  left: var(--sidenav-w-collapsed);
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  isolation: isolate;
+  overflow-y: auto;
+  padding: 2.2rem clamp(1.2rem, 3vw, 3rem) 4rem;
+  background: linear-gradient(160deg, var(--anime-blue-1) 0%, var(--anime-blue-2) 55%, #ffffff 100%);
+  color: var(--anime-ink);
+}
+
+.anime-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.anime-bokeh {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(20px);
+  opacity: 0.55;
+}
+
+.anime-bokeh--1 {
+  width: 240px;
+  height: 240px;
+  top: -70px;
+  left: 6%;
+  background: radial-gradient(circle at 30% 30%, #cfe0ff 0%, rgba(207, 224, 255, 0) 70%);
+}
+
+.anime-bokeh--2 {
+  width: 180px;
+  height: 180px;
+  top: 12%;
+  right: 8%;
+  background: radial-gradient(circle at 35% 35%, #ffe3ef 0%, rgba(255, 227, 239, 0) 70%);
+}
+
+.anime-bokeh--3 {
+  width: 300px;
+  height: 300px;
+  bottom: -110px;
+  left: 20%;
+  background: radial-gradient(circle at 40% 40%, #e6d9ff 0%, rgba(230, 217, 255, 0) 70%);
+}
+
+.anime-bokeh--4 {
+  width: 160px;
+  height: 160px;
+  bottom: 8%;
+  right: 12%;
+  background: radial-gradient(circle at 35% 35%, #d8ecff 0%, rgba(216, 236, 255, 0) 70%);
+}
+
+.anime-petal {
+  position: absolute;
+  top: -5%;
+  width: 14px;
+  height: 18px;
+  background: linear-gradient(135deg, #ffdcec, #ffb3cf);
+  border-radius: 60% 40% 60% 40% / 60% 40% 60% 40%;
+  opacity: 0;
+  animation: petal-fall linear infinite;
+}
+
+.anime-petal--1 { left: 8%;  animation-duration: 15s; animation-delay: 0s; }
+.anime-petal--2 { left: 22%; animation-duration: 18s; animation-delay: 3s; }
+.anime-petal--3 { left: 41%; animation-duration: 13s; animation-delay: 1.5s; }
+.anime-petal--4 { left: 63%; animation-duration: 17s; animation-delay: 5s; }
+.anime-petal--5 { left: 80%; animation-duration: 14s; animation-delay: 2.5s; }
+.anime-petal--6 { left: 92%; animation-duration: 19s; animation-delay: 6.5s; }
+
+@keyframes petal-fall {
+  0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+  8% { opacity: 0.85; }
+  92% { opacity: 0.7; }
+  100% { transform: translateY(560px) translateX(50px) rotate(240deg); opacity: 0; }
+}
+
+.anime-content {
+  position: relative;
+  z-index: 1;
+}
+
+.anime-head h1 {
+  color: var(--anime-ink);
+}
+
+.anime-head .section__hint {
+  color: var(--anime-ink-dim);
+}
+
+/* Tarjetas de vidrio */
+#section-anime .anime-card__cover {
+  position: relative;
+  border-radius: var(--anime-radius);
+  background: var(--anime-glass-bg);
+  border: 1px solid var(--anime-glass-border);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 12px 30px -14px rgba(60, 80, 140, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#section-anime .anime-card:hover .anime-card__cover,
+#section-anime .anime-card:focus .anime-card__cover {
+  border-color: var(--anime-gold);
+  box-shadow: 0 16px 36px -10px rgba(201, 150, 47, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+#section-anime .anime-card__badge {
+  color: var(--anime-gold);
+}
+
+#section-anime .anime-card__name {
+  color: var(--anime-ink);
+  font-weight: 600;
+}
+
+#section-anime .anime-card__meta {
+  color: var(--anime-ink-dim);
+}
+
+#section-anime .anime-card__rating {
+  color: var(--anime-gold);
+}
+
+#section-anime .focusable:focus {
+  outline-color: var(--anime-gold);
+}
+
+#section-anime .breadcrumb__back {
+  background: var(--anime-glass-bg);
+  border-color: var(--anime-glass-border);
+  color: var(--anime-ink-dim);
+  backdrop-filter: blur(10px);
+}
+
+#section-anime .breadcrumb__back:hover {
+  color: var(--anime-ink);
+  border-color: var(--anime-gold);
+}
+
+#section-anime .breadcrumb__current {
+  color: var(--anime-ink-dim);
+}
+
+#section-anime .breadcrumb__current::before {
+  color: rgba(98, 110, 140, 0.4);
+}
+
+/* Episodios dentro de Anime (reutilizan .channel-card) */
+#section-anime .channel-card {
+  background: var(--anime-glass-bg);
+  border-color: var(--anime-glass-border);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-radius: var(--anime-radius);
+  box-shadow: 0 12px 28px -16px rgba(60, 80, 140, 0.35);
+}
+
+#section-anime .channel-card:hover,
+#section-anime .channel-card:focus {
+  border-color: var(--anime-gold);
+}
+
+#section-anime .channel-card__logo {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+#section-anime .channel-card__badge {
+  color: var(--anime-gold);
+}
+
+#section-anime .channel-card__name {
+  color: var(--anime-ink);
+}
+
+#section-anime .empty-state {
+  background: var(--anime-glass-bg-strong);
+  border-color: var(--anime-glass-border);
+  backdrop-filter: blur(14px);
+  color: var(--anime-ink-dim);
+}
+
+#section-anime .empty-state h3 {
+  color: var(--anime-ink);
+}
+
+/* ---------------------------------------------------------
+   Estado vacío (genérico)
+   --------------------------------------------------------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 2.4rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 480px;
+  color: var(--text-dim);
+}
+
+.empty-state__icon {
+  font-size: 1.6rem;
+}
+
+.empty-state h3 {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------
+   Reproductor (pantalla completa)
+   --------------------------------------------------------- */
+
+.player-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  background: #000;
+}
+
+.player-overlay[hidden] {
+  display: none;
+}
+
+#video {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: contain;
+}
+
+.player-iframe {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.player-iframe[hidden] {
+  display: none;
+}
+
+.player-ui {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2.2rem 2.6rem;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0) 24%,
+    rgba(0, 0, 0, 0) 68%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+  opacity: 1;
+  transition: opacity 0.35s ease;
+  pointer-events: none; /* el centro deja pasar los clics al video/iframe de abajo */
+}
+
+.player-ui__top,
+.player-ui__bottom {
+  pointer-events: auto; /* solo estas barras capturan clics/foco */
+}
+
+.player-ui.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-ui__top {
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+}
+
+.player-ui__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-ui__bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  background: var(--player-glass-bg);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--player-glass-border);
+  border-radius: 26px;
+  padding: 1.1rem 1.4rem;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+}
+
+.player-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.player-seek-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.player-seek-row[hidden] {
+  display: none;
+}
+
+.player-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.75);
+  min-width: 3.2rem;
+  text-align: center;
+}
+
+.player-seek {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  outline: none;
+}
+
+.player-seek::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.player-seek::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.player-seek.focusable:focus {
+  transform: none; /* el zoom general se ve raro en una barra larga */
+  outline-offset: 4px;
+}
+
+.player-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--player-glass-border);
+  background: var(--player-glass-bg);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.7rem 1.3rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.player-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.player-btn--accent {
+  background: var(--player-accent);
+  border-color: var(--player-accent);
+  color: #3a2210;
+}
+
+.player-btn--accent:hover {
+  background: var(--player-accent-strong);
+}
+
+.player-btn__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* El botón de play/pausa vive dentro del panel de vidrio inferior, así
+   que se ve como un ícono circular simple en vez de otra píldora. */
+.player-controls-row .player-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  border: none;
+  box-shadow: none;
+}
+
+.player-controls-row .player-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.server-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.server-btn {
+  border: 1px solid var(--player-glass-border);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.server-btn.is-active {
+  color: #3a2210;
+  background: var(--player-accent);
+  border-color: var(--player-accent);
+  font-weight: 700;
+}
+
+/* Estado de carga / error, siempre por encima de las barras */
+
+.player-status {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  background: rgba(0, 0, 0, 0.6);
+  text-align: center;
+  padding: 2rem;
+}
+
+.player-status[hidden] {
+  display: none;
+}
+
+.player-spinner {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--player-accent);
+  animation: spin 0.9s linear infinite;
+}
+
+.player-spinner[hidden] {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.player-status__text {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 520px;
+  margin: 0;
+}
+
+.player-status__text.is-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.player-error-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.player-error-actions[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------
+   Responsive
+   --------------------------------------------------------- */
+
+/* ---------------------------------------------------------
+   Móvil / táctil
+   ------------------------------------------------------------
+   Por debajo de este ancho asumimos teléfono u tablet en
+   vertical: la barra lateral (pensada para mouse/D-Pad) se
+   convierte en una barra de navegación inferior fija, como en
+   cualquier app móvil — con las etiquetas siempre visibles (no
+   depende de hover/foco, que no existen al tocar la pantalla).
+   --------------------------------------------------------- */
+
+@media (max-width: 780px) {
+  html {
+    font-size: 16px;
+  }
+
+  .sidenav {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: auto;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0;
+    padding: 0.3rem 0.3rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
+    border-right: none;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
+    transition: none;
+  }
+
+  .sidenav__brand {
+    display: none; /* no hay espacio en una barra inferior */
+  }
+
+  .sidenav__nav {
+    flex-direction: row;
+    width: 100%;
+    gap: 0.2rem;
+  }
+
+  .sidenav__item {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.5rem 0.2rem;
+    font-size: 0.68rem;
+    text-align: center;
+  }
+
+  /* En la barra inferior las etiquetas siempre se ven: no dependen
+     de is-expanded, que ya no existe en este layout. */
+  .sidenav__label,
+  .sidenav.is-expanded .sidenav__label {
+    opacity: 1;
+    transform: none;
+    white-space: nowrap;
+  }
+
+  .sidenav__icon {
+    font-size: 1.35rem;
+  }
+
+  main.content {
+    margin-left: 0;
+    padding: 1.3rem 1rem calc(5.2rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .channel-grid,
+  .home-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.8rem;
+  }
+
+  .anime-grid {
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 0.8rem;
+  }
+
+  #section-anime.anime-theme {
+    padding: 1.6rem 1rem 2.2rem;
+  }
+
+  /* Reproductor: controles más compactos y con objetivos de toque
+     grandes (mínimo ~44px recomendado). */
+  .player-ui {
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .player-ui__top {
+    padding-top: env(safe-area-inset-top, 0px);
+    gap: 0.8rem;
+  }
+
+  .player-ui__title {
+    font-size: 1rem;
+  }
+
+  .player-btn {
+    padding: 0.6rem 1.05rem;
+    font-size: 0.92rem;
+  }
+
+  .player-controls-row .player-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  .player-seek::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .player-seek::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .player-seek {
+    height: 8px;
+  }
+
+  .server-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+}
