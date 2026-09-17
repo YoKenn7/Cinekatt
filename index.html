@@ -78,6 +78,11 @@
         <p class="section__hint">Accesos rápidos a todo el contenido.</p>
       </div>
 
+      <div id="continue-watching" class="cw-section" hidden>
+        <h2 class="cw-section__title">Continuar viendo</h2>
+        <div id="continue-watching-row" class="anime-grid" role="list"></div>
+      </div>
+
       <div id="home-grid" class="home-grid" role="list">
         <button class="home-card focusable" data-goto="anime" type="button" role="listitem">
           <span class="home-card__icon" aria-hidden="true">🎌</span>
@@ -202,6 +207,13 @@
       </div>
 
       <div class="player-ui__bottom">
+        <button id="player-nextup" class="player-nextup focusable" type="button" hidden>
+          <span>Siguiente episodio</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
         <div id="player-seek-row" class="player-seek-row" hidden>
           <span id="player-time-current" class="player-time">0:00</span>
           <input
@@ -257,6 +269,7 @@
   <script src="js/anime-loader.js"></script>
   <script src="js/movies.js"></script>
   <script src="js/movies-loader.js"></script>
+  <script src="js/continue-watching.js"></script>
   <script src="js/player.js"></script>
   <script src="js/app.js"></script>
 </body>

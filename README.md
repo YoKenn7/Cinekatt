@@ -366,3 +366,22 @@ problemas combinados:
 navegó a algo dentro de la app (para bloquear el cierre por defecto), o
 `false`/nada cuando no hay a dónde volver (para dejar que el sistema
 cierre la app normalmente, solo en la pantalla raíz).
+
+## Siguiente episodio y avance automático (Anime)
+
+Cuando ves un episodio, el reproductor conoce de antemano cuál es el
+siguiente (si existe) gracias a `buildEpisodeOpenParams()` en `app.js`,
+que arma la cadena completa por adelantado.
+
+- Al llegar al 92% del episodio, aparece un botón **"Siguiente
+  episodio"** flotando sobre el panel de controles.
+- Si el video llega a su final de forma natural, pasa solo al siguiente
+  (sin que tengas que tocar nada) — usando `Player.openNext()`, que
+  cambia el contenido sin cerrar el reproductor ni salir de pantalla
+  completa.
+- En "Continuar viendo", un episodio recién terminado desaparece y en su
+  lugar aparece el **siguiente**, marcado con una insignia "Siguiente"
+  en vez de la barra de progreso (todavía no tiene avance real hasta que
+  lo empieces a ver).
+- Las películas no tienen "siguiente" — ese concepto es exclusivo de
+  series con episodios.

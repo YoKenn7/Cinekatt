@@ -27,6 +27,22 @@ const ANIME_FILES = [
   "twac.js",
   "titt.js",
   "mini.js",
+  "tdi.js",
+  "rag.js",
+  "tans2.js",
+  "osananajimi-to-wa-love-comedy-ni-naranai.js",
+  "chiwaram.js",
+  "kaoniden.js",
+  "miksanwa.js",
+  "seibutyar.js",
+  "kurmedni.js",
+  "konkaini.js",
+  "tokbosrus.js",
+  "senwaoto.js",
+  "gimsei.js",
+  "wuljiuwan.js",
+  "uruyat(20.js",
+  "thedanin.js",
 ];
 
 const ANIME_SERIES_BASE_PATH = "js/anime/series/";

@@ -25,9 +25,9 @@ const CHANNELS = [
     name: "Canal 5",
     logo: "assets/logos/canal5.png",
     servers: [
-      {
+        {
         name: "Servidor 1",
-        url: "https://khala.futlivehd.com/canal5mx/tracks-v1a1/mono.m3u8?ip=187.161.18.153&token=be5ae61ca12385d92d1b273445bd1219b9ef9f68-93-1789393518-1789339518"
+        url: "https://razen.futlivehd.com/canal5mx/index.m3u8?ip=187.161.17.89&token=416eb063bf4c23c945caca48be142986e299dbeb-b8-1789657264-1789603264"
       }
     ]
   },

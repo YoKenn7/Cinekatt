@@ -39,6 +39,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadMovies(); // carga js/movies/items/*.js listados en movies-loader.js
   renderMovies();
 
+  renderContinueWatching();
+
   // Foco inicial: primer acceso rápido de Inicio.
   TVNav.focusFirstIn(document.getElementById("home-grid")) ||
     TVNav.focusFirstIn(document.querySelector(".sidenav__nav"));
@@ -258,7 +260,7 @@ function renderAnimeEpisodes(serie) {
     return;
   }
 
-  serie.episodes.forEach((episode) => {
+  serie.episodes.forEach((episode, index) => {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "channel-card focusable";
@@ -290,18 +292,89 @@ function renderAnimeEpisodes(serie) {
     card.appendChild(name);
 
     card.addEventListener("click", () => {
-      Player.open({
-        title: `${serie.title} — ${episode.title}`,
-        servers: episode.servers,
-        returnFocusEl: card,
-        live: false
-      });
+      const params = buildEpisodeOpenParams(serie, index);
+      if (!params) return;
+      Player.open({ ...params, returnFocusEl: card });
     });
 
     grid.appendChild(card);
   });
 
   TVNav.focusFirstIn(grid);
+}
+
+// Construye los parámetros listos para Player.open()/openNext() de un
+// episodio, incluyendo (de forma recursiva) los del episodio siguiente
+// en "nextUp" — así el reproductor puede mostrar el botón "Siguiente
+// episodio" y avanzar solo sin que la app tenga que intervenir.
+function buildEpisodeOpenParams(serie, index) {
+  const episode = serie.episodes[index];
+  if (!episode) return null;
+
+  const contentId = `anime:${serie.id}:${episode.id}`;
+  const saved = ContinueWatching.getProgress(contentId);
+  const nextEpisode = serie.episodes[index + 1] || null;
+  const nextParams = nextEpisode ? buildEpisodeOpenParams(serie, index + 1) : null;
+
+  let alreadyAdvanced = false; // evita repetir la escritura cada 5s tras el 92%
+
+  return {
+    title: `${serie.title} — ${episode.title}`,
+    servers: episode.servers,
+    live: false,
+    resumeAt: saved ? saved.currentTime : 0,
+    onProgress: (currentTime, duration) => {
+      const ratio = duration > 0 ? currentTime / duration : 0;
+
+      if (ratio >= 0.92) {
+        if (!alreadyAdvanced) {
+          alreadyAdvanced = true;
+          ContinueWatching.remove(contentId);
+          if (nextEpisode) {
+            ContinueWatching.upsertNext({
+              id: `anime:${serie.id}:${nextEpisode.id}`,
+              title: `${serie.title} — ${nextEpisode.title}`,
+              cover: nextEpisode.thumbnail || serie.cover || null,
+              kind: "anime",
+              servers: nextEpisode.servers
+            });
+          }
+          renderContinueWatching();
+        }
+      } else {
+        ContinueWatching.upsert({
+          id: contentId,
+          title: `${serie.title} — ${episode.title}`,
+          cover: episode.thumbnail || serie.cover || null,
+          kind: "anime",
+          servers: episode.servers,
+          currentTime,
+          duration
+        });
+        renderContinueWatching();
+      }
+    },
+    nextUp: nextParams
+  };
+}
+
+// Busca a qué serie/episodio corresponde un id guardado en Continuar
+// viendo (formato "anime:<serieId>:<episodeId>"). Devuelve null si la
+// serie o el episodio ya no existen (por ejemplo, si se renombró el id).
+function findAnimeEpisodeByContentId(id) {
+  const parts = id.split(":");
+  if (parts.length < 3 || parts[0] !== "anime") return null;
+
+  const serieId = parts[1];
+  const episodeId = parts.slice(2).join(":");
+
+  const serie = ANIME_SERIES.find((s) => s.id === serieId);
+  if (!serie || !serie.episodes) return null;
+
+  const index = serie.episodes.findIndex((ep) => ep.id === episodeId);
+  if (index === -1) return null;
+
+  return { serie, index };
 }
 
 function buildBadge(text) {
@@ -386,7 +459,127 @@ function buildMovieCard(movie) {
   card.appendChild(name);
 
   card.addEventListener("click", () => {
-    Player.open({ title: movie.title, servers: movie.servers, returnFocusEl: card, live: false });
+    const contentId = `movie:${movie.id}`;
+    const saved = ContinueWatching.getProgress(contentId);
+
+    Player.open({
+      title: movie.title,
+      servers: movie.servers,
+      returnFocusEl: card,
+      live: false,
+      resumeAt: saved ? saved.currentTime : 0,
+      onProgress: (currentTime, duration) => {
+        ContinueWatching.upsert({
+          id: contentId,
+          title: movie.title,
+          cover: movie.cover || null,
+          kind: "movie",
+          servers: movie.servers,
+          currentTime,
+          duration
+        });
+        renderContinueWatching();
+      }
+    });
+  });
+
+  return card;
+}
+
+/* ---------------------------------------------------------
+   Continuar viendo
+   --------------------------------------------------------- */
+
+function renderContinueWatching() {
+  const section = document.getElementById("continue-watching");
+  const row = document.getElementById("continue-watching-row");
+
+  const entries = ContinueWatching.getAll();
+  row.innerHTML = "";
+
+  if (entries.length === 0) {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+  entries.forEach((entry) => {
+    row.appendChild(buildContinueWatchingCard(entry));
+  });
+}
+
+function buildContinueWatchingCard(entry) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "anime-card cw-card focusable";
+  card.setAttribute("role", "listitem");
+  card.setAttribute("aria-label", `Continuar viendo ${entry.title}`);
+
+  const cover = document.createElement("div");
+  cover.className = "anime-card__cover";
+
+  if (entry.cover) {
+    const img = document.createElement("img");
+    img.src = entry.cover;
+    img.alt = entry.title;
+    img.loading = "lazy";
+    img.onerror = () => {
+      img.remove();
+      cover.appendChild(buildAnimeBadge(entry.title));
+    };
+    cover.appendChild(img);
+  } else {
+    cover.appendChild(buildAnimeBadge(entry.title));
+  }
+
+  if (entry.isNext) {
+    const badge = document.createElement("span");
+    badge.className = "cw-card__next-badge";
+    badge.textContent = "Siguiente";
+    cover.appendChild(badge);
+  } else {
+    const track = document.createElement("div");
+    track.className = "cw-card__progress-track";
+    const fill = document.createElement("div");
+    fill.className = "cw-card__progress-fill";
+    const pct = entry.duration > 0 ? Math.min(100, (entry.currentTime / entry.duration) * 100) : 0;
+    fill.style.width = `${pct}%`;
+    track.appendChild(fill);
+    cover.appendChild(track);
+  }
+
+  const name = document.createElement("span");
+  name.className = "anime-card__name";
+  name.textContent = entry.title;
+
+  card.appendChild(cover);
+  card.appendChild(name);
+
+  card.addEventListener("click", () => {
+    if (entry.kind === "anime") {
+      const found = findAnimeEpisodeByContentId(entry.id);
+      if (found) {
+        const params = buildEpisodeOpenParams(found.serie, found.index);
+        if (params) {
+          Player.open({ ...params, returnFocusEl: card });
+          return;
+        }
+      }
+    }
+
+    // Respaldo: la serie/episodio ya no existe en el catálogo (o es una
+    // película), pero igual se puede reproducir con los datos guardados.
+    Player.open({
+      title: entry.title,
+      servers: entry.servers,
+      returnFocusEl: card,
+      live: false,
+      resumeAt: entry.currentTime,
+      onProgress: (currentTime, duration) => {
+        ContinueWatching.upsert({ ...entry, currentTime, duration });
+        renderContinueWatching();
+      }
+    });
   });
 
   return card;
@@ -438,6 +631,10 @@ function goToSection(key) {
   });
 
   NavState.section = key;
+
+  if (key === "inicio") {
+    renderContinueWatching();
+  }
 
   const focusContainer = document.getElementById(FIRST_FOCUS_ID[key]);
   TVNav.focusFirstIn(focusContainer) ||

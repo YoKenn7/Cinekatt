@@ -31,6 +31,7 @@ const Player = (() => {
   const seekEl = document.getElementById("player-seek");
   const timeCurrentEl = document.getElementById("player-time-current");
   const timeDurationEl = document.getElementById("player-time-duration");
+  const nextUpEl = document.getElementById("player-nextup");
 
   const statusEl = document.getElementById("player-status");
   const spinnerEl = document.getElementById("player-spinner");
@@ -83,6 +84,20 @@ const Player = (() => {
   // de otro dominio — si eso pasara, el botón físico Return del control
   // dejaría de llegarle a la app (ver startIframeFocusWatchdog más abajo).
   let iframeFocusWatchdog = null;
+
+  // "Continuar viendo": segundo en el que reanudar (0 = desde el
+  // principio) y callback para reportar el avance mientras se reproduce.
+  // Solo aplica a contenido no-en-vivo con un <video> real (no iframe).
+  let resumeAtSeconds = 0;
+  let onProgressCallback = null;
+  let lastReportedAt = 0;
+  const PROGRESS_REPORT_INTERVAL_MS = 5000;
+
+  // "Siguiente episodio": datos del contenido a seguir (mismo formato
+  // que recibe open()) y umbral de progreso al que aparece el botón.
+  let currentNextUp = null;
+  let nextUpShown = false;
+  const NEXT_UP_THRESHOLD = 0.92;
 
   /* ---------------------------------------------------------
      Resolución de la URL de reproducción
@@ -202,7 +217,33 @@ const Player = (() => {
     seekEl.value = video.currentTime;
     timeCurrentEl.textContent = formatTime(video.currentTime);
     updateSeekFill();
+
+    if (onProgressCallback && Date.now() - lastReportedAt > PROGRESS_REPORT_INTERVAL_MS) {
+      lastReportedAt = Date.now();
+      onProgressCallback(video.currentTime, video.duration);
+    }
+
+    if (currentNextUp && !nextUpShown && video.duration > 0) {
+      if (video.currentTime / video.duration >= NEXT_UP_THRESHOLD) {
+        nextUpShown = true;
+        nextUpEl.hidden = false;
+      }
+    }
   });
+
+  video.addEventListener("ended", () => {
+    if (currentNextUp) {
+      goToNextUp();
+    }
+  });
+
+  nextUpEl.addEventListener("click", goToNextUp);
+
+  function goToNextUp() {
+    const next = currentNextUp;
+    if (!next) return;
+    openNext(next);
+  }
 
   seekEl.addEventListener("input", () => {
     isSeeking = true;
@@ -321,6 +362,9 @@ const Player = (() => {
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (myToken !== sessionToken) return;
         hideStatus();
+        if (resumeAtSeconds > 0) {
+          video.currentTime = resumeAtSeconds;
+        }
         video.play().catch(() => {
           /* el navegador/TV puede bloquear autoplay; el usuario da play manualmente */
         });
@@ -339,6 +383,9 @@ const Player = (() => {
         () => {
           if (myToken !== sessionToken) return;
           hideStatus();
+          if (resumeAtSeconds > 0) {
+            video.currentTime = resumeAtSeconds;
+          }
           video.play().catch(() => {});
         },
         { once: true }
@@ -470,13 +517,20 @@ const Player = (() => {
      Abrir / cerrar
      --------------------------------------------------------- */
 
-  function open({ title, servers, returnFocusEl: origin, live }) {
+  function open({ title, servers, returnFocusEl: origin, live, resumeAt, onProgress, nextUp }) {
     if (!servers || servers.length === 0) return;
 
     titleEl.textContent = title || "";
     currentServers = servers;
     returnFocusEl = origin || document.activeElement;
     isLive = live !== false; // por defecto se asume en vivo (sin barra) si no se especifica
+
+    resumeAtSeconds = isLive ? 0 : (resumeAt || 0);
+    onProgressCallback = isLive ? null : (onProgress || null);
+    lastReportedAt = 0;
+    currentNextUp = isLive ? null : (nextUp || null);
+    nextUpShown = false;
+    nextUpEl.hidden = true;
 
     overlay.hidden = false;
     document.body.style.overflow = "hidden";
@@ -495,7 +549,51 @@ const Player = (() => {
     loadServer(0);
   }
 
+  /**
+   * Pasa al siguiente contenido (ej. el próximo episodio) SIN cerrar el
+   * reproductor ni salir de pantalla completa — a diferencia de open(),
+   * no toca el overlay ni el foco de "volver", solo reemplaza qué se
+   * está reproduciendo. Se usa desde el botón "Siguiente episodio" y al
+   * terminar el video automáticamente.
+   */
+  function openNext({ title, servers, resumeAt, onProgress, nextUp }) {
+    if (!servers || servers.length === 0) return;
+
+    titleEl.textContent = title || "";
+    currentServers = servers;
+
+    resumeAtSeconds = resumeAt || 0;
+    onProgressCallback = onProgress || null;
+    lastReportedAt = 0;
+    currentNextUp = nextUp || null;
+    nextUpShown = false;
+    nextUpEl.hidden = true;
+
+    playPauseBtn.innerHTML = ICON_PAUSE;
+    seekEl.value = 0;
+    seekEl.style.background = "rgba(255, 255, 255, 0.25)";
+    timeCurrentEl.textContent = "0:00";
+    timeDurationEl.textContent = "0:00";
+    seekRowEl.hidden = true;
+
+    showUi();
+    loadServer(0);
+  }
+
   function close() {
+    // Reporta el punto exacto donde se quedó, ANTES de tocar el video.
+    // Si esto era un servidor tipo iframe, currentTime/duration nunca se
+    // llenaron de verdad, así que el guardado del lado de la app los
+    // descarta solo (duración inválida) — no hace falta distinguir aquí.
+    if (onProgressCallback) {
+      onProgressCallback(video.currentTime, video.duration);
+    }
+    onProgressCallback = null;
+    resumeAtSeconds = 0;
+    currentNextUp = null;
+    nextUpShown = false;
+    nextUpEl.hidden = true;
+
     // Invalida cualquier resolve/callback que siga en curso de esta
     // sesión — aunque termine después, su resultado ya no se aplicará.
     sessionToken++;

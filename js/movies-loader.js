@@ -23,6 +23,7 @@ const MOVIE_FILES = [
   "ts5.js",
   "bck.js",
   "ovd.js",
+  "ddg.js",
 ];
 
 const MOVIES_BASE_PATH = "js/movies/items/";

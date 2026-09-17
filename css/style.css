@@ -507,8 +507,58 @@ main.content {
 }
 
 /* ---------------------------------------------------------
-   Breadcrumb (navegación de Anime: serie ↔ episodios)
+   Continuar viendo
    --------------------------------------------------------- */
+
+.cw-section {
+  margin-bottom: 2.2rem;
+}
+
+.cw-section[hidden] {
+  display: none;
+}
+
+.cw-section__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 1rem;
+}
+
+.cw-card .anime-card__cover {
+  position: relative;
+}
+
+.cw-card__progress-track {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.cw-card__progress-fill {
+  height: 100%;
+  background: var(--player-accent);
+  border-radius: 999px;
+}
+
+.cw-card__next-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--player-accent);
+  color: #3a2210;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+}
 
 .breadcrumb {
   display: flex;
@@ -885,6 +935,7 @@ main.content {
 }
 
 .player-ui__bottom {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
@@ -895,6 +946,33 @@ main.content {
   border-radius: 26px;
   padding: 1.1rem 1.4rem;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+}
+
+.player-nextup {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--player-accent);
+  color: #3a2210;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.player-nextup:hover {
+  background: var(--player-accent-strong);
+}
+
+.player-nextup[hidden] {
+  display: none;
 }
 
 .player-controls-row {
