@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <title>CineKenn</title>
+
+  <script>
+    (function () {
+      // Detecta si el dispositivo se maneja por toque (móvil/tablet) en vez
+      // de mouse/teclado o control remoto de TV. Se usa para mostrar el
+      // botón de pantalla completa y quitar el recuadro de foco solo ahí;
+      // en PC/TV esos elementos se comportan exactamente igual que antes.
+      var isTouch = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      if (isTouch) {
+        document.documentElement.classList.add("is-mobile");
+      }
+    })();
+  </script>
   <meta name="description" content="TV en Vivo — canales en directo, anime, películas y series en un mismo lugar." />
 
   <!-- Mobile / "instalar en pantalla de inicio" -->
@@ -209,6 +222,11 @@
             <svg class="player-btn__icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <rect x="6" y="5" width="4" height="14" rx="1"/>
               <rect x="14" y="5" width="4" height="14" rx="1"/>
+            </svg>
+          </button>
+          <button id="player-fullscreen" class="player-btn focusable" type="button" aria-label="Pantalla completa">
+            <svg class="player-btn__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
           <div id="server-list" class="server-list" role="list" aria-label="Servidores disponibles">

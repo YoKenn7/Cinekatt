@@ -24,6 +24,7 @@ const Player = (() => {
   const uiEl = document.getElementById("player-ui");
   const closeBtn = document.getElementById("player-close");
   const playPauseBtn = document.getElementById("player-playpause");
+  const fullscreenBtn = document.getElementById("player-fullscreen");
   const serverListEl = document.getElementById("server-list");
 
   const seekRowEl = document.getElementById("player-seek-row");
@@ -48,6 +49,14 @@ const Player = (() => {
   const ICON_PLAY =
     '<svg class="player-btn__icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
     '<path d="M8 5v14l11-7z"/></svg>';
+
+  const ICON_FULLSCREEN_ENTER =
+    '<svg class="player-btn__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+    '<path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const ICON_FULLSCREEN_EXIT =
+    '<svg class="player-btn__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+    '<path d="M4 9h4V5M20 9h-4V5M4 15h4v4M20 15h-4v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   let hls = null;
   let currentServers = [];
@@ -411,6 +420,53 @@ const Player = (() => {
   }
 
   /* ---------------------------------------------------------
+     Pantalla completa (botón visible solo en móvil vía CSS)
+     ------------------------------------------------------------
+     Se pide fullscreen sobre "overlay" (no solo sobre el <video>) para
+     que la barra de controles propia también quede dentro de la
+     pantalla completa. El único caso sin esa opción es Safari de iOS
+     viejo (antes de la versión 16.4), que solo sabe poner en pantalla
+     completa el <video> directamente vía webkitEnterFullscreen; ahí se
+     usa como último recurso, aunque eso oculte la UI personalizada.
+     --------------------------------------------------------- */
+
+  function getFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function updateFullscreenIcon() {
+    if (!fullscreenBtn) return;
+    const active = !!getFullscreenElement();
+    fullscreenBtn.innerHTML = active ? ICON_FULLSCREEN_EXIT : ICON_FULLSCREEN_ENTER;
+    fullscreenBtn.setAttribute(
+      "aria-label",
+      active ? "Salir de pantalla completa" : "Pantalla completa"
+    );
+  }
+
+  function toggleFullscreen() {
+    if (getFullscreenElement()) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      return;
+    }
+
+    if (overlay.requestFullscreen) {
+      overlay.requestFullscreen().catch(() => {});
+    } else if (overlay.webkitRequestFullscreen) {
+      overlay.webkitRequestFullscreen();
+    } else if (video.webkitEnterFullscreen) {
+      video.webkitEnterFullscreen();
+    }
+  }
+
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreenIcon);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenIcon);
+  }
+
+  /* ---------------------------------------------------------
      Abrir / cerrar
      --------------------------------------------------------- */
 
@@ -426,6 +482,7 @@ const Player = (() => {
     document.body.style.overflow = "hidden";
 
     playPauseBtn.innerHTML = ICON_PAUSE;
+    updateFullscreenIcon();
     seekEl.value = 0;
     seekEl.style.background = "rgba(255, 255, 255, 0.25)";
     timeCurrentEl.textContent = "0:00";
@@ -450,6 +507,11 @@ const Player = (() => {
     }
 
     stopIframeFocusWatchdog();
+
+    if (getFullscreenElement()) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
 
     destroyHls();
     video.pause(); // corta el sonido/imagen de inmediato, antes de limpiar el src

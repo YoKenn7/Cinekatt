@@ -116,6 +116,15 @@ img {
   z-index: 3;
 }
 
+/* En móvil (pantalla táctil) no hay navegación por teclado ni control
+   remoto, así que este recuadro solo se ve como una selección que se
+   queda pegada tras tocar. Se quita únicamente en ese caso; en PC/TV
+   sigue exactamente igual, porque ahí sí guía la navegación. */
+html.is-mobile .focusable:focus {
+  outline: none;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
@@ -1002,6 +1011,17 @@ main.content {
   background: rgba(255, 255, 255, 0.28);
 }
 
+/* El botón de pantalla completa solo tiene sentido en móvil: en PC el
+   usuario ya tiene F11/el propio navegador, y en TV la app ya ocupa
+   toda la pantalla. Se oculta salvo cuando html.is-mobile está activo. */
+#player-fullscreen {
+  display: none;
+}
+
+html.is-mobile #player-fullscreen {
+  display: inline-flex;
+}
+
 .server-list {
   display: flex;
   flex-wrap: wrap;
@@ -1177,6 +1197,12 @@ main.content {
   }
 
   #section-anime.anime-theme {
+    /* En escritorio esta sección deja el hueco de la barra lateral
+       colapsada (--sidenav-w-collapsed). En móvil esa barra pasa a ser
+       una barra inferior de ancho completo, así que ese hueco a la
+       izquierda ya no debe reservarse: sin este left:0 la sección de
+       Anime quedaba corrida hacia la derecha. */
+    left: 0;
     padding: 1.6rem 1rem 2.2rem;
   }
 
