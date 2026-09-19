@@ -624,6 +624,40 @@ const Player = (() => {
     );
   }
 
+  // Al entrar en pantalla completa en móvil, fuerza landscape (el video
+  // se ve mucho mejor horizontal que vertical). Safari de iOS no
+  // implementa este API todavía, así que ahí simplemente no pasa nada
+  // y la persona rota el teléfono a mano — no rompe nada, solo no
+  // auto-rota. Se libera el bloqueo al salir de pantalla completa para
+  // no dejar el teléfono "trabado" en horizontal en el resto de la app.
+  function lockLandscape() {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("landscape").catch(() => {});
+    }
+  }
+
+  function unlockOrientation() {
+    if (screen.orientation && screen.orientation.unlock) {
+      try {
+        screen.orientation.unlock();
+      } catch (err) {
+        /* algunos navegadores tiran error si nunca hubo lock activo */
+      }
+    }
+  }
+
+  function handleFullscreenChange() {
+    updateFullscreenIcon();
+
+    if (!document.documentElement.classList.contains("is-mobile")) return;
+
+    if (getFullscreenElement()) {
+      lockLandscape();
+    } else {
+      unlockOrientation();
+    }
+  }
+
   function toggleFullscreen() {
     if (getFullscreenElement()) {
       if (document.exitFullscreen) document.exitFullscreen();
@@ -642,8 +676,8 @@ const Player = (() => {
 
   if (fullscreenBtn) {
     fullscreenBtn.addEventListener("click", toggleFullscreen);
-    document.addEventListener("fullscreenchange", updateFullscreenIcon);
-    document.addEventListener("webkitfullscreenchange", updateFullscreenIcon);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
   }
 
   /* ---------------------------------------------------------
