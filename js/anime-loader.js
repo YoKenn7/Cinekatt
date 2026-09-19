@@ -43,6 +43,15 @@ const ANIME_FILES = [
   "wuljiuwan.js",
   "uruyat(20.js",
   "thedanin.js",
+  "spykyo.js",
+  "renflo.js",
+  "seinakim.js",
+  "grablu.js",
+  "grablu2.js",
+  "grablu3.js",
+  "repdatkoi.js",
+  "youjitshi.js",
+  "woneggpri.js",
 ];
 
 const ANIME_SERIES_BASE_PATH = "js/anime/series/";

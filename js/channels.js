@@ -27,7 +27,7 @@ const CHANNELS = [
     servers: [
         {
         name: "Servidor 1",
-        url: "https://razen.futlivehd.com/canal5mx/index.m3u8?ip=187.161.17.89&token=416eb063bf4c23c945caca48be142986e299dbeb-b8-1789657264-1789603264"
+        url: "https://fala.futlivehd.com/canal5mx/index.m3u8?ip=187.161.16.89&token=4e7b63531bffb1d078eab74d94b5e7b5f29a19c0-76-1789834912-1789780912"
       }
     ]
   },

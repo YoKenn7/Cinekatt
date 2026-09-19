@@ -99,11 +99,36 @@ const Player = (() => {
   let nextUpShown = false;
   const NEXT_UP_THRESHOLD = 0.92;
 
+  // Caché de resoluciones: guarda el .m3u8 ya resuelto de cada servidor
+  // (por su resolveEndpoint) durante un rato corto, para no volver a
+  // pasar por todo el proceso de resolución si el usuario sale y entra
+  // de nuevo rápido, o si ya se precargó el siguiente episodio. Vive
+  // solo en memoria (se pierde si recargas la página) y usa un tiempo
+  // fijo propio, sin fiarse de la expiración que traiga cada proveedor.
+  const resolveCache = new Map(); // resolveEndpoint -> { url, expiresAt }
+  const RESOLVE_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 8 minutos
+  const RESOLVE_CACHE_MAX_ENTRIES = 10;
+
+  function trimResolveCache() {
+    while (resolveCache.size > RESOLVE_CACHE_MAX_ENTRIES) {
+      const oldestKey = resolveCache.keys().next().value;
+      resolveCache.delete(oldestKey);
+    }
+  }
+
+  // Precarga del siguiente episodio: se dispara al llegar al 90% del
+  // actual, resolviendo en segundo plano SOLO el link (nunca descarga
+  // segmentos de video), con su propio controlador de cancelación para
+  // no interferir con la resolución del contenido que se está viendo.
+  let preloadAbortController = null;
+  let preloadTriggered = false;
+  const PRELOAD_THRESHOLD = 0.9;
+
   /* ---------------------------------------------------------
      Resolución de la URL de reproducción
      --------------------------------------------------------- */
 
-  async function resolveServerUrl(server) {
+  async function resolveServerUrl(server, options) {
     // Si el servidor define "resolveEndpoint", se le pide la URL
     // actualizada a ese endpoint en vez de usar una fija. Si no lo
     // define (caso actual de todos tus canales/animes), se usa
@@ -112,20 +137,41 @@ const Player = (() => {
       return server.url;
     }
 
-    // Si ya había un resolve en curso (de otro servidor/contenido), se
-    // cancela de verdad antes de empezar este — así nunca hay dos
-    // peticiones de resolve compitiendo entre sí.
-    if (activeAbortController) {
-      activeAbortController.abort();
+    // ¿Ya lo teníamos resuelto de hace poco (o lo precargamos)? Se usa
+    // directo, sin volver a pasar por todo el proceso de resolución.
+    const cached = resolveCache.get(server.resolveEndpoint);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.url;
     }
-    const controller = new AbortController();
-    activeAbortController = controller;
+
+    // Las llamadas normales (reproducción en curso) usan y cancelan
+    // activeAbortController; la precarga en segundo plano pasa su
+    // propio "signal" para no pisarse con la resolución principal.
+    const externalSignal = options && options.signal;
+    let controller = null;
+
+    if (!externalSignal) {
+      if (activeAbortController) {
+        activeAbortController.abort();
+      }
+      controller = new AbortController();
+      activeAbortController = controller;
+    }
+
+    const signal = externalSignal || controller.signal;
 
     try {
-      const res = await fetch(server.resolveEndpoint, { signal: controller.signal });
+      const res = await fetch(server.resolveEndpoint, { signal });
       if (!res.ok) throw new Error(`resolveEndpoint respondió ${res.status}`);
       const data = await res.json();
       if (!data || !data.url) throw new Error("respuesta sin campo 'url'");
+
+      resolveCache.set(server.resolveEndpoint, {
+        url: data.url,
+        expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS
+      });
+      trimResolveCache();
+
       return data.url;
     } catch (err) {
       if (err && err.name === "AbortError") {
@@ -137,7 +183,7 @@ const Player = (() => {
       if (server.url) return server.url;
       throw err;
     } finally {
-      if (activeAbortController === controller) {
+      if (controller && activeAbortController === controller) {
         activeAbortController = null;
       }
     }
@@ -157,7 +203,7 @@ const Player = (() => {
 
     loadingTimeoutTimer = setTimeout(() => {
       statusTextEl.textContent =
-        "Esto está tardando más de lo normal. Puedes esperar o volver.";
+        "Ya casi esta!, espera un poco mas :D";
       errorActionsEl.hidden = false;
     }, LOADING_TIMEOUT);
   }
@@ -186,6 +232,32 @@ const Player = (() => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  /**
+   * Espera a que se acumule un colchón mínimo de buffer por delante del
+   * punto de reproducción antes de darle play() — evita el corte típico
+   * de "arranca y se traba a los 2 segundos" por reproducir apenas llega
+   * el primer fragmento. Tiene un tope de espera para no sentirse más
+   * lento de lo necesario si la conexión ya viene bien.
+   */
+  function waitForMinimalBuffer(minSeconds, maxWaitMs) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      function check() {
+        const buffered = video.buffered;
+        let bufferedAhead = 0;
+        if (buffered.length > 0) {
+          bufferedAhead = buffered.end(buffered.length - 1) - video.currentTime;
+        }
+        if (bufferedAhead >= minSeconds || Date.now() - start > maxWaitMs) {
+          resolve();
+        } else {
+          setTimeout(check, 150);
+        }
+      }
+      check();
+    });
   }
 
   function updateSeekVisibility() {
@@ -223,6 +295,13 @@ const Player = (() => {
       onProgressCallback(video.currentTime, video.duration);
     }
 
+    if (currentNextUp && !preloadTriggered && video.duration > 0) {
+      if (video.currentTime / video.duration >= PRELOAD_THRESHOLD) {
+        preloadTriggered = true;
+        preloadNextEpisode(currentNextUp);
+      }
+    }
+
     if (currentNextUp && !nextUpShown && video.duration > 0) {
       if (video.currentTime / video.duration >= NEXT_UP_THRESHOLD) {
         nextUpShown = true;
@@ -243,6 +322,37 @@ const Player = (() => {
     const next = currentNextUp;
     if (!next) return;
     openNext(next);
+  }
+
+  /**
+   * Resuelve en segundo plano SOLO el link del siguiente episodio (nunca
+   * descarga video), para que esté listo en el caché cuando el usuario
+   * llegue ahí. No toca la reproducción actual ni su propio controlador
+   * de cancelación — vive completamente aparte.
+   */
+  async function preloadNextEpisode(nextUpParams) {
+    const server = nextUpParams && nextUpParams.servers && nextUpParams.servers[0];
+    if (!server || !server.resolveEndpoint) return; // nada que precargar (url fija o iframe)
+
+    const cached = resolveCache.get(server.resolveEndpoint);
+    if (cached && cached.expiresAt > Date.now()) return; // ya está listo
+
+    if (preloadAbortController) {
+      preloadAbortController.abort();
+    }
+    const controller = new AbortController();
+    preloadAbortController = controller;
+
+    try {
+      await resolveServerUrl(server, { signal: controller.signal });
+    } catch {
+      // Si falla o se cancela, no pasa nada: se resolverá normal cuando
+      // el usuario de verdad llegue a ese episodio.
+    } finally {
+      if (preloadAbortController === controller) {
+        preloadAbortController = null;
+      }
+    }
   }
 
   seekEl.addEventListener("input", () => {
@@ -355,16 +465,32 @@ const Player = (() => {
     if (myToken !== sessionToken) return;
 
     if (Hls.isSupported()) {
-      hls = new Hls();
+      hls = new Hls({
+        // Arranca en la calidad MÁS BAJA disponible y sube sola si la
+        // conexión lo permite, en vez de adivinar una calidad alta con
+        // el primer fragmento (que puede haber llegado rápido "de
+        // suerte") y trabarse en cuanto se acaba ese colchón inicial.
+        startLevel: 0,
+        // No acumula más de 60s de buffer YA REPRODUCIDO en memoria —
+        // se descarta lo viejo. Evita que una sesión larga viendo
+        // episodios seguidos vaya consumiendo cada vez más RAM.
+        backBufferLength: 60
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, async () => {
         if (myToken !== sessionToken) return;
-        hideStatus();
         if (resumeAtSeconds > 0) {
           video.currentTime = resumeAtSeconds;
         }
+
+        // Espera un colchón corto antes de reproducir (máx. 4s de
+        // espera) — si ya está listo antes, no se pierde tiempo extra.
+        await waitForMinimalBuffer(2.5, 4000);
+        if (myToken !== sessionToken) return; // pudo cambiar mientras esperábamos
+
+        hideStatus();
         video.play().catch(() => {
           /* el navegador/TV puede bloquear autoplay; el usuario da play manualmente */
         });
@@ -374,18 +500,25 @@ const Player = (() => {
         if (myToken !== sessionToken) return;
         if (data.fatal) {
           showError("No se pudo cargar este servidor. Prueba con otro o vuelve a intentar.");
+        } else {
+          // No fatal: HLS.js normalmente se recupera solo (por eso el
+          // corte "se traba y sigue"). Se deja registrado para poder
+          // confirmar si los ajustes de buffer reducen su frecuencia.
+          console.warn("HLS.js: error no fatal:", data.type, data.details);
         }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       video.addEventListener(
         "loadedmetadata",
-        () => {
+        async () => {
           if (myToken !== sessionToken) return;
-          hideStatus();
           if (resumeAtSeconds > 0) {
             video.currentTime = resumeAtSeconds;
           }
+          await waitForMinimalBuffer(2.5, 4000);
+          if (myToken !== sessionToken) return;
+          hideStatus();
           video.play().catch(() => {});
         },
         { once: true }
@@ -530,6 +663,7 @@ const Player = (() => {
     lastReportedAt = 0;
     currentNextUp = isLive ? null : (nextUp || null);
     nextUpShown = false;
+    preloadTriggered = false;
     nextUpEl.hidden = true;
 
     overlay.hidden = false;
@@ -567,6 +701,7 @@ const Player = (() => {
     lastReportedAt = 0;
     currentNextUp = nextUp || null;
     nextUpShown = false;
+    preloadTriggered = false;
     nextUpEl.hidden = true;
 
     playPauseBtn.innerHTML = ICON_PAUSE;
@@ -592,6 +727,7 @@ const Player = (() => {
     resumeAtSeconds = 0;
     currentNextUp = null;
     nextUpShown = false;
+    preloadTriggered = false;
     nextUpEl.hidden = true;
 
     // Invalida cualquier resolve/callback que siga en curso de esta
@@ -602,6 +738,14 @@ const Player = (() => {
     if (activeAbortController) {
       activeAbortController.abort();
       activeAbortController = null;
+    }
+
+    // Cancela también cualquier precarga del siguiente episodio que
+    // siguiera en curso — si el usuario ya se fue, no tiene sentido
+    // seguir gastando la petición.
+    if (preloadAbortController) {
+      preloadAbortController.abort();
+      preloadAbortController = null;
     }
 
     stopIframeFocusWatchdog();
